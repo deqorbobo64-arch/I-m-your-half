@@ -1,29 +1,25 @@
 import telebot
 import google.generativeai as genai
 import requests
-import json
 import os
 import yt_dlp
 from datetime import datetime
-import threading
-import time
 
 # === SOZLAMALAR ===
 BOT_TOKEN = "8679558924:AAGrf-E2jlSzzt3lRILoc3C5FOcw-ShVX_o"
 GEMINI_API_KEY = "AIzaSyDCYf2QVD_VY4Ipo2MP0By23yY2xBRtivU"
 CHANNEL_ID = "@tezkor_habar_robot"
-ADMIN_ID = 0  # O'z Telegram ID ingizni yozing
 
 # === SETUP ===
 genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel('gemini-pro')
+model = genai.GenerativeModel('gemini-1.5-flash')
 bot = telebot.TeleBot(BOT_TOKEN)
 
-# === DATABASE (oddiy) ===
+# === DATABASE ===
 users = {}
 premium_users = set()
 
-# === KANALGA AZOLARNI TEKSHIRISH ===
+# === KANAL TEKSHIRISH ===
 def check_subscription(user_id):
     try:
         member = bot.get_chat_member(CHANNEL_ID, user_id)
@@ -35,12 +31,12 @@ def check_subscription(user_id):
 @bot.message_handler(commands=['start'])
 def start(message):
     user_id = message.from_user.id
-    users[user_id] = {'count': 0, 'date': str(datetime.now().date())}
-    
+    if user_id not in users:
+        users[user_id] = {'count': 0, 'date': str(datetime.now().date())}
     if not check_subscription(user_id):
         markup = telebot.types.InlineKeyboardMarkup()
         btn = telebot.types.InlineKeyboardButton(
-            "📢 Kanalga a'zo bo'lish", 
+            "📢 Kanalga a'zo bo'lish",
             url="https://t.me/tezkor_habar_robot"
         )
         check_btn = telebot.types.InlineKeyboardButton(
@@ -49,11 +45,10 @@ def start(message):
         )
         markup.add(btn)
         markup.add(check_btn)
-        bot.send_message(message.chat.id, 
-            "⚡ Botdan foydalanish uchun kanalga a'zo bo'ling!",
+        bot.send_message(message.chat.id,
+            "⚡ Botdan foydalanish uchun avval kanalga a'zo bo'ling!",
             reply_markup=markup)
         return
-    
     show_menu(message.chat.id)
 
 def show_menu(chat_id):
@@ -63,11 +58,10 @@ def show_menu(chat_id):
     markup.row("🎵 Musiqa", "📹 Video")
     markup.row("🎮 O'yin", "☀️ Ob-havo")
     markup.row("💰 Premium", "ℹ️ Haqida")
-    
     bot.send_message(chat_id,
         "👋 Salom! Men <b>I'm your half</b> botman!\n\n"
         "🆓 Bepul: Kuniga 10 ta savol\n"
-        "💎 Premium: Cheksiz (15,000 so'm/oy)\n\n"
+        "💎 Premium: Cheksiz (30,000 so'm/oy)\n\n"
         "Quyidagi bo'limlardan birini tanlang:",
         parse_mode='HTML',
         reply_markup=markup)
@@ -76,12 +70,12 @@ def show_menu(chat_id):
 @bot.callback_query_handler(func=lambda call: call.data == "check_sub")
 def check_sub_callback(call):
     if check_subscription(call.from_user.id):
-        bot.answer_callback_query(call.id, "✅ Rahmat! Botga xush kelibsiz!")
+        bot.answer_callback_query(call.id, "✅ Rahmat!")
         show_menu(call.message.chat.id)
     else:
         bot.answer_callback_query(call.id, "❌ Hali a'zo bo'lmadingiz!")
 
-# === LIMIT TEKSHIRISH ===
+# === LIMIT ===
 def check_limit(user_id):
     if user_id in premium_users:
         return True
@@ -98,24 +92,21 @@ def check_limit(user_id):
 # === AI SAVOL ===
 @bot.message_handler(func=lambda m: m.text == "🤖 AI Savol")
 def ai_menu(message):
-    bot.send_message(message.chat.id, 
-        "🤖 Savolingizni yozing, javob beraman!")
+    bot.send_message(message.chat.id, "🤖 Savolingizni yozing!")
     bot.register_next_step_handler(message, handle_ai)
 
 def handle_ai(message):
-    user_id = message.from_user.id
-    if not check_subscription(user_id):
-        bot.send_message(message.chat.id, "❌ Avval kanalga a'zo bo'ling!")
+    if not check_subscription(message.from_user.id):
+        start(message)
         return
-    if not check_limit(user_id):
-        bot.send_message(message.chat.id, 
-            "⚠️ Kunlik limit tugadi!\n💎 Premium oling: /premium")
+    if not check_limit(message.from_user.id):
+        bot.send_message(message.chat.id, "⚠️ Limit tugadi!\n💎 /premium")
         return
     bot.send_message(message.chat.id, "⏳ Javob tayyorlanmoqda...")
     try:
         response = model.generate_content(message.text)
         bot.send_message(message.chat.id, response.text)
-    except:
+    except Exception as e:
         bot.send_message(message.chat.id, "❌ Xatolik! Qayta urinib ko'ring.")
 
 # === TARJIMA ===
@@ -124,8 +115,35 @@ def translate_menu(message):
     markup = telebot.types.ReplyKeyboardMarkup(resize_keyboard=True)
     markup.row("🇺🇿 O'zbekcha", "🇷🇺 Ruscha", "🇬🇧 Inglizcha")
     markup.row("🔙 Orqaga")
-    bot.send_message(message.chat.id, "Qaysi tilga tarjima qilaylik?", 
+    bot.send_message(message.chat.id, "Qaysi tilga tarjima qilaylik?",
         reply_markup=markup)
+    bot.register_next_step_handler(message, handle_translate_lang)
+
+def handle_translate_lang(message):
+    lang = message.text
+    if lang == "🔙 Orqaga":
+        show_menu(message.chat.id)
+        return
+    bot.send_message(message.chat.id, "Tarjima qilinadigan matnni yozing:")
+    bot.register_next_step_handler(message, lambda m: handle_translate(m, lang))
+
+def handle_translate(message, lang):
+    if not check_limit(message.from_user.id):
+        bot.send_message(message.chat.id, "⚠️ Limit tugadi! /premium")
+        return
+    lang_map = {
+        "🇺🇿 O'zbekcha": "o'zbek",
+        "🇷🇺 Ruscha": "rus",
+        "🇬🇧 Inglizcha": "ingliz"
+    }
+    target = lang_map.get(lang, "o'zbek")
+    bot.send_message(message.chat.id, "⏳ Tarjima qilinmoqda...")
+    try:
+        prompt = f"Quyidagi matnni {target} tiliga tarjima qil, faqat tarjimani yoz:\n{message.text}"
+        response = model.generate_content(prompt)
+        bot.send_message(message.chat.id, response.text)
+    except:
+        bot.send_message(message.chat.id, "❌ Xatolik!")
 
 # === MATN YOZISH ===
 @bot.message_handler(func=lambda m: m.text == "📝 Matn Yozish")
@@ -133,15 +151,45 @@ def text_menu(message):
     markup = telebot.types.ReplyKeyboardMarkup(resize_keyboard=True)
     markup.row("📄 CV Yozish", "📧 Xat Yozish")
     markup.row("📱 Post Yozish", "📊 Biznes Reja")
-    markup.row("🔙 Orqaga")
+    markup.row("✍️ Hikoya", "🔙 Orqaga")
     bot.send_message(message.chat.id, "Qaysi turdagi matn kerak?",
         reply_markup=markup)
+
+@bot.message_handler(func=lambda m: m.text in ["📄 CV Yozish", "📧 Xat Yozish", "📱 Post Yozish", "📊 Biznes Reja", "✍️ Hikoya"])
+def handle_text_type(message):
+    prompts = {
+        "📄 CV Yozish": "Kasb va tajribangizni yozing:",
+        "📧 Xat Yozish": "Xat mavzusini yozing:",
+        "📱 Post Yozish": "Post mavzusini yozing:",
+        "📊 Biznes Reja": "Biznes g'oyangizni yozing:",
+        "✍️ Hikoya": "Hikoya mavzusini yozing:"
+    }
+    text_type = message.text
+    bot.send_message(message.chat.id, prompts[text_type])
+    bot.register_next_step_handler(message, lambda m: generate_text(m, text_type))
+
+def generate_text(message, text_type):
+    if not check_limit(message.from_user.id):
+        bot.send_message(message.chat.id, "⚠️ Limit tugadi! /premium")
+        return
+    type_prompts = {
+        "📄 CV Yozish": f"Professional CV yoz: {message.text}",
+        "📧 Xat Yozish": f"Rasmiy xat yoz: {message.text}",
+        "📱 Post Yozish": f"Ijtimoiy tarmoq uchun post yoz: {message.text}",
+        "📊 Biznes Reja": f"Biznes reja yoz: {message.text}",
+        "✍️ Hikoya": f"Qiziqarli hikoya yoz: {message.text}"
+    }
+    bot.send_message(message.chat.id, "⏳ Yozilmoqda...")
+    try:
+        response = model.generate_content(type_prompts[text_type])
+        bot.send_message(message.chat.id, response.text)
+    except:
+        bot.send_message(message.chat.id, "❌ Xatolik!")
 
 # === KINO ===
 @bot.message_handler(func=lambda m: m.text == "🎬 Kino")
 def movie_menu(message):
-    bot.send_message(message.chat.id, 
-        "🎬 Kino nomini yozing, ma'lumot beraman!")
+    bot.send_message(message.chat.id, "🎬 Kino nomini yozing!")
     bot.register_next_step_handler(message, handle_movie)
 
 def handle_movie(message):
@@ -150,7 +198,7 @@ def handle_movie(message):
         return
     bot.send_message(message.chat.id, "🔍 Qidirilmoqda...")
     try:
-        prompt = f"'{message.text}' kinosi haqida ma'lumot ber: yil, janr, rejissyor, qisqacha syujet. O'zbek tilida yoz."
+        prompt = f"'{message.text}' kinosi haqida batafsil ma'lumot ber: yil, janr, rejissyor, aktyorlar, IMDB reyting, qisqacha syujet. O'zbek tilida yoz."
         response = model.generate_content(prompt)
         bot.send_message(message.chat.id, response.text)
     except:
@@ -159,8 +207,7 @@ def handle_movie(message):
 # === MUSIQA ===
 @bot.message_handler(func=lambda m: m.text == "🎵 Musiqa")
 def music_menu(message):
-    bot.send_message(message.chat.id,
-        "🎵 Qo'shiq nomini yozing, YouTube dan topib beraman!")
+    bot.send_message(message.chat.id, "🎵 Qo'shiq nomini yozing!")
     bot.register_next_step_handler(message, handle_music)
 
 def handle_music(message):
@@ -179,10 +226,8 @@ def handle_music(message):
             info = ydl.extract_info(message.text, download=False)
             if 'entries' in info:
                 info = info['entries'][0]
-            url = info['url']
-            title = info['title']
-            bot.send_message(message.chat.id, 
-                f"🎵 {title}\n\n🔗 Link: {info['webpage_url']}")
+            bot.send_message(message.chat.id,
+                f"🎵 {info['title']}\n\n🔗 {info['webpage_url']}")
     except:
         bot.send_message(message.chat.id, "❌ Topilmadi!")
 
@@ -221,6 +266,23 @@ def game_menu(message):
     markup.row("🔢 Matematika", "🔙 Orqaga")
     bot.send_message(message.chat.id, "O'yin tanlang!", reply_markup=markup)
 
+@bot.message_handler(func=lambda m: m.text in ["🧩 Topishmoq", "❓ Viktorina", "🔢 Matematika"])
+def handle_game(message):
+    if not check_limit(message.from_user.id):
+        bot.send_message(message.chat.id, "⚠️ Limit tugadi! /premium")
+        return
+    prompts = {
+        "🧩 Topishmoq": "Qiziqarli o'zbek topishmoqi ber va javobini ham yoz.",
+        "❓ Viktorina": "Qiziqarli viktorina savoli ber, 4 ta variant ko'rsat (A,B,C,D) va javobini ayt.",
+        "🔢 Matematika": "Qiziqarli matematika masalasi ber va yechimini ko'rsat."
+    }
+    bot.send_message(message.chat.id, "⏳ Tayyorlanmoqda...")
+    try:
+        response = model.generate_content(prompts[message.text])
+        bot.send_message(message.chat.id, response.text)
+    except:
+        bot.send_message(message.chat.id, "❌ Xatolik!")
+
 # === OB-HAVO ===
 @bot.message_handler(func=lambda m: m.text == "☀️ Ob-havo")
 def weather_menu(message):
@@ -229,7 +291,7 @@ def weather_menu(message):
 
 def handle_weather(message):
     try:
-        url = f"https://wttr.in/{message.text}?format=3&lang=uz"
+        url = f"https://wttr.in/{message.text}?format=3"
         response = requests.get(url)
         bot.send_message(message.chat.id, f"☀️ {response.text}")
     except:
@@ -242,10 +304,14 @@ def premium_menu(message):
         "💎 <b>PREMIUM</b>\n\n"
         "✅ Cheksiz savol\n"
         "✅ Tezroq javob\n"
-        "✅ Video yuklab berish\n\n"
-        "💰 Narx: <b>15,000 so'm/oy</b>\n\n"
-        "To'lov uchun admin bilan bog'laning:\n"
-        "@admin",
+        "✅ Video yuklab berish\n"
+        "✅ Musiqa yuklab berish\n\n"
+        "💰 Narx: <b>30,000 so'm/oy</b>\n\n"
+        "💳 To'lov uchun karta:\n"
+        "<code>5614 6812 2745 5718</code>\n"
+        "👤 Abaraliyev Ismoiljon\n\n"
+        "✅ To'lov qilgach screenshotni yuboring:\n"
+        "@sening_yarming_robot",
         parse_mode='HTML')
 
 # === HAQIDA ===
@@ -253,14 +319,16 @@ def premium_menu(message):
 def about(message):
     bot.send_message(message.chat.id,
         "🤖 <b>I'm your half Bot</b>\n\n"
-        "⚡ Kanal: @tezkor_habar_robot\n"
+        "⚡ Kanal: @tezkor_habar_robot\n\n"
         "🌟 Funksiyalar:\n"
-        "• AI savol-javob\n"
-        "• Tarjima\n"
-        "• Kino ma'lumoti\n"
-        "• Musiqa va video\n"
-        "• O'yinlar\n"
-        "• Ob-havo\n\n"
+        "• 🤖 AI savol-javob\n"
+        "• 🌐 Tarjima\n"
+        "• 📝 Matn yozish\n"
+        "• 🎬 Kino ma'lumoti\n"
+        "• 🎵 Musiqa topish\n"
+        "• 📹 Video yuklab berish\n"
+        "• 🎮 O'yinlar\n"
+        "• ☀️ Ob-havo\n\n"
         "💎 Premium: 30,000 so'm/oy",
         parse_mode='HTML')
 
@@ -277,7 +345,7 @@ def handle_all(message):
         start(message)
         return
     if not check_limit(user_id):
-        bot.send_message(message.chat.id, 
+        bot.send_message(message.chat.id,
             "⚠️ Kunlik limit tugadi!\n💎 Premium: /premium")
         return
     bot.send_message(message.chat.id, "⏳ Javob tayyorlanmoqda...")
@@ -288,5 +356,5 @@ def handle_all(message):
         bot.send_message(message.chat.id, "❌ Xatolik!")
 
 # === ISHGA TUSHIRISH ===
-print("Bot ishlamoqda...")
+print("✅ Bot ishlamoqda...")
 bot.polling(none_stop=True)
