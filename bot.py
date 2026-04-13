@@ -316,6 +316,7 @@ def handle_all(message):
     except:
         bot.send_message(message.chat.id, "❌ Xatolik!")
 
-# === ISHGA TUSHIRISH ===
-print("Bot ishlamoqda...")
-bot.polling(none_stop=True)
+# === if __name__ == "__main__":
+    keep_alive()
+    print("Bot ishga tushdi...")
+    bot.polling(none_stop=True)
