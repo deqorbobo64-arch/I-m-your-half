@@ -35,10 +35,13 @@ if __name__ == "__main__":
     # Masalan: bot.polling(none_stop=True)
 
 # === SOZLAMALAR ===
-BOT_TOKEN = "8679558924:AAGrf-E2jlSzzt3lRILoc3C5FOcw-ShVX_o"
-GEMINI_API_KEY = "AIzaSyDCYf2QVD_VY4Ipo2MP0By23yY2xBRtivU"
+import os
+
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+
 CHANNEL_ID = "@tezkor_habar_robot"
-ADMIN_ID = 0  # O'z Telegram ID ingizni yozing
+ADMIN_ID = 0
 
 # === SETUP ===
 genai.configure(api_key=GEMINI_API_KEY)
