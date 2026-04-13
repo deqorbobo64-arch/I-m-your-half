@@ -4,6 +4,8 @@ import requests
 import os
 import yt_dlp
 from datetime import datetime
+import threading
+from flask import Flask
 
 # === SOZLAMALAR ===
 BOT_TOKEN = "8679558924:AAGrf-E2jlSzzt3lRILoc3C5FOcw-ShVX_o"
@@ -14,10 +16,15 @@ CHANNEL_ID = "@tezkor_habar_robot"
 genai.configure(api_key=GEMINI_API_KEY)
 model = genai.GenerativeModel('gemini-1.5-flash')
 bot = telebot.TeleBot(BOT_TOKEN)
+app = Flask(__name__)
 
 # === DATABASE ===
 users = {}
 premium_users = set()
+
+@app.route('/')
+def home():
+    return 'Bot ishlayapti! ✅'
 
 # === KANAL TEKSHIRISH ===
 def check_subscription(user_id):
@@ -106,7 +113,7 @@ def handle_ai(message):
     try:
         response = model.generate_content(message.text)
         bot.send_message(message.chat.id, response.text)
-    except Exception as e:
+    except:
         bot.send_message(message.chat.id, "❌ Xatolik! Qayta urinib ko'ring.")
 
 # === TARJIMA ===
@@ -356,5 +363,9 @@ def handle_all(message):
         bot.send_message(message.chat.id, "❌ Xatolik!")
 
 # === ISHGA TUSHIRISH ===
-print("✅ Bot ishlamoqda...")
-bot.polling(none_stop=True)
+def run_bot():
+    print("✅ Bot ishlamoqda...")
+    bot.polling(none_stop=True)
+
+threading.Thread(target=run_bot, daemon=True).start()
+app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
