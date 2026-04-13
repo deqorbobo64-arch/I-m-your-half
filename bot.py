@@ -7,6 +7,32 @@ import yt_dlp
 from datetime import datetime
 import threading
 import time
+import os
+from flask import Flask
+from threading import Thread
+# ... sening boshqa importlaring (telebot yoki aiogram) ...
+
+app = Flask('')
+
+@app.route('/')
+def home():
+    return "Bot is alive!"
+
+def run():
+    # Render PORT muhit o'zgaruvchisini avtomat beradi
+    port = int(os.environ.get("PORT", 8080))
+    app.run(host='0.0.0.0', port=port)
+
+def keep_alive():
+    t = Thread(target=run)
+    t.start()
+
+# Botni ishga tushirish qismi
+if __name__ == "__main__":
+    keep_alive()  # Web serverni alohida oqimda yurgizadi
+    
+    # SHU YERDAN PASTIGA botingni yurgizish kodini qo'y
+    # Masalan: bot.polling(none_stop=True)
 
 # === SOZLAMALAR ===
 BOT_TOKEN = "8679558924:AAGrf-E2jlSzzt3lRILoc3C5FOcw-ShVX_o"
