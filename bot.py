@@ -9,7 +9,7 @@ from flask import Flask
 
 # === SOZLAMALAR ===
 BOT_TOKEN = "8679558924:AAGrf-E2jlSzzt3lRILoc3C5FOcw-ShVX_o"
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 CHANNEL_ID = "@tezkor_habar_robot"
 
 # === SETUP ===
