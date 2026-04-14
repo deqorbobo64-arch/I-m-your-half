@@ -6,8 +6,8 @@ import threading
 from flask import Flask
 import yt_dlp
 
-BOT_TOKEN = "8679558924:AAGrf-E2jlSzzt3lRILoc3C5FOcw-ShVX_o"
-OPENROUTER_API_KEY = "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"
+BOT_TOKEN = "8679558924:AAErITY0HEWdvYWGqGKdufSX6cfKm9bRVE0"
+OPENROUTER_API_KEY = "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"
 CHANNEL_ID = "@tezkor_habar_robot"
 
 bot = telebot.TeleBot(BOT_TOKEN)
