@@ -2,8 +2,6 @@ import telebot
 import requests
 import os
 from datetime import datetime
-import threading
-from flask import Flask
 import yt_dlp
 
 BOT_TOKEN = "8679558924:AAErITY0HEWdvYWGqGKdufSX6cfKm9bRVE0"
@@ -11,28 +9,26 @@ OPENROUTER_API_KEY = "sk-or-v1-506d6f51f3a21afff7732ef9baef17bb7491496d917e16049
 CHANNEL_ID = "@tezkor_habar_robot"
 
 bot = telebot.TeleBot(BOT_TOKEN)
-app = Flask(__name__)
-
 users = {}
 premium_users = set()
 
 def ask_ai(prompt):
-    response = requests.post(
-        "https://openrouter.ai/api/v1/chat/completions",
-        headers={
-            "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-            "Content-Type": "application/json"
-        },
-        json={
-            "model": "mistralai/mistral-7b-instruct:free",
-            "messages": [{"role": "user", "content": prompt}]
-        }
-    )
-    return response.json()['choices'][0]['message']['content']
-
-@app.route('/')
-def home():
-    return 'Bot ishlayapti!'
+    try:
+        response = requests.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "model": "mistralai/mistral-7b-instruct:free",
+                "messages": [{"role": "user", "content": prompt}]
+            },
+            timeout=30
+        )
+        return response.json()['choices'][0]['message']['content']
+    except:
+        return "Xatolik yuz berdi, qayta urinib ko'ring!"
 
 def check_subscription(user_id):
     try:
@@ -84,21 +80,17 @@ def start(message):
         "🧩 Topishmoq, viktorina o'ynayman\n\n"
         "🆓 Bepul: Kuniga 10 ta savol\n"
         "💎 Premium: 30,000 so'm/oy — cheksiz\n\n"
-        "Shunchaki yozing, javob beraman! 😊",
+        "Shunchaki yozing! 😊",
         parse_mode='HTML')
 
 @bot.callback_query_handler(func=lambda call: call.data == "check_sub")
 def check_sub_callback(call):
     if check_subscription(call.from_user.id):
         bot.answer_callback_query(call.id, "✅ Rahmat!")
-        msg = call.message
-        msg.from_user = call.from_user
-        start(msg)
+        bot.send_message(call.message.chat.id,
+            "👋 Xush kelibsiz! Shunchaki yozing! 😊")
     else:
         bot.answer_callback_query(call.id, "❌ Hali a'zo bo'lmadingiz!")
-
-def is_youtube_or_instagram(text):
-    return any(x in text for x in ['youtube.com', 'youtu.be', 'instagram.com', 'tiktok.com'])
 
 @bot.message_handler(func=lambda message: True)
 def handle_all(message):
@@ -111,7 +103,7 @@ def handle_all(message):
     if not check_limit(user_id):
         bot.send_message(message.chat.id,
             "⚠️ Kunlik limit tugadi!\n\n"
-            "💎 Premium olish uchun:\n"
+            "💎 Premium olish:\n"
             "Karta: <code>5614 6812 2745 5718</code>\n"
             "👤 Abaraliyev Ismoiljon\n"
             "Narx: 30,000 so'm/oy\n\n"
@@ -122,7 +114,7 @@ def handle_all(message):
     text = message.text
 
     # Video yuklab berish
-    if is_youtube_or_instagram(text):
+    if any(x in text for x in ['youtube.com', 'youtu.be', 'instagram.com', 'tiktok.com']):
         try:
             ydl_opts = {
                 'format': 'best[filesize<50M]',
@@ -139,28 +131,9 @@ def handle_all(message):
             bot.send_message(message.chat.id, "❌ Video yuklab bo'lmadi!")
         return
 
-    # Musiqa qidirish
-    if any(x in text.lower() for x in ['qo\'shiq', 'musiqa', 'song', 'music', 'топ ', 'найди песню']):
-        try:
-            ydl_opts = {
-                'format': 'bestaudio/best',
-                'noplaylist': True,
-                'quiet': True,
-                'default_search': 'ytsearch1'
-            }
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(text, download=False)
-                if 'entries' in info:
-                    info = info['entries'][0]
-                bot.send_message(message.chat.id,
-                    f"🎵 {info['title']}\n\n🔗 {info['webpage_url']}")
-        except:
-            bot.send_message(message.chat.id, "❌ Topilmadi!")
-        return
-
     # Ob-havo
     if any(x in text.lower() for x in ['ob-havo', 'havo', 'погода', 'weather']):
-        city = text.replace('ob-havo', '').replace('havo', '').replace('погода', '').replace('weather', '').strip()
+        city = text.lower().replace('ob-havo', '').replace('havo', '').replace('погода', '').replace('weather', '').strip()
         if not city:
             city = 'Tashkent'
         try:
@@ -171,14 +144,8 @@ def handle_all(message):
         return
 
     # AI javob
-    try:
-        response = ask_ai(text)
-        bot.send_message(message.chat.id, response)
-    except:
-        bot.send_message(message.chat.id, "❌ Xatolik!")
+    response = ask_ai(text)
+    bot.send_message(message.chat.id, response)
 
-def run_bot():
-    print("✅ Bot ishlamoqda...")
-    bot.infinity_polling()
-
-run_bot()
+print("✅ Bot ishlamoqda...")
+bot.infinity_polling()
