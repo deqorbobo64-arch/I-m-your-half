@@ -4,7 +4,7 @@ import os
 from datetime import datetime
 import yt_dlp
 
-BOT_TOKEN = "8679558924:AAErITY0HEWdvYWGqGKdufSX6cfKm9bRVE0"
+"8679558924:AAGg2bbevVCiCmUFXVkLk_5ffQw3i7OeanU"
 OPENROUTER_API_KEY = "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"
 CHANNEL_ID = "@tezkor_habar_robot"
 
